@@ -2,6 +2,8 @@
 
 **[English](#english) · [Türkçe](#türkçe)**
 
+> 🐳 **Docker:** Internet-in-a-Box kurmadan Docker ile çalıştırmak için / to run with Docker instead of Internet-in-a-Box: **[DOCKER.md](DOCKER.md)**
+
 ---
 
 ## English
@@ -82,6 +84,8 @@ scripts/install-homepage.sh  installs the custom homepage
 config/iiab-overrides.yml  Internet-in-a-Box settings
 config/content.conf        list of content to download
 www/home/index.html        homepage
+docker-compose.yml, docker/  Docker setup (see DOCKER.md)
+config/maps.conf           map regions (Docker only)
 ```
 
 ### Troubleshooting
@@ -196,6 +200,8 @@ scripts/install-homepage.sh  özel ana sayfayı kurar
 config/iiab-overrides.yml    Internet-in-a-Box ayarları
 config/content.conf          indirilecek içerik listesi
 www/home/index.html          ana sayfa
+docker-compose.yml, docker/  Docker kurulumu (bkz. DOCKER.md)
+config/maps.conf             harita bölgeleri (sadece Docker)
 ```
 
 ### Sorun giderme

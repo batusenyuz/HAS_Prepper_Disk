@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HAS_PrepperDisk :: Yönetim</title>
+<style>
+  body{margin:0;background:#E5E5E5;color:#000;font-family:Verdana,Tahoma,Arial,sans-serif;font-size:12px;line-height:1.6}
+  .wrap{max-width:760px;margin:0 auto;padding:16px}
+  .box{background:#fff;border:1px solid #98AAB1;padding:12px 16px;margin-bottom:12px}
+  h1{font-size:16px;margin:0 0 8px} h2{font-size:13px;margin:12px 0 4px;color:#006699}
+  a{color:#006699;text-decoration:none} a:hover{color:#DD6900}
+  pre{background:#F5F5F5;border:1px solid #D1D7DC;padding:6px 8px;overflow-x:auto;margin:4px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="box">
+  <h1>Yönetim (Docker kurulumu)</h1>
+  <p>Bu kurulum Internet-in-a-Box yerine Docker ile çalışıyor, bu yüzden içerikler web panelinden değil sunucudaki komutlarla yönetilir. Komutları repo klasöründe çalıştırın.</p>
+
+  <h2>Kütüphane (Kiwix ZIM dosyaları)</h2>
+  <p>Listeyi <code>config/content.conf</code> dosyasında düzenleyin, sonra:</p>
+  <pre>docker compose run --rm downloader zims</pre>
+  <p>Yarıda kalırsa aynı komutu tekrar çalıştırın, kaldığı yerden devam eder. Yeni kitaplar birkaç saniye içinde kütüphanede görünür.</p>
+
+  <h2>Haritalar</h2>
+  <p>Bölgeleri <code>config/maps.conf</code> dosyasında seçin. İndirmeden önce boyutları görmek için:</p>
+  <pre>docker compose run --rm downloader maps-size
+docker compose run --rm downloader maps</pre>
+
+  <h2>Kolibri</h2>
+  <p><a href="/kolibri/">Kolibri</a> ilk açılışta kurulum sihirbazını gösterir. Kanalları (dersleri) Kolibri'nin kendi <i>Cihaz → Kanallar</i> menüsünden içe aktarın.</p>
+
+  <h2>Servisler</h2>
+  <pre>docker compose ps
+docker compose logs -f
+docker compose pull &amp;&amp; docker compose up -d --build</pre>
+  <p><a href="/home/">&larr; Ana Sayfa</a></p>
+</div>
+</div>
+</body>
+</html>

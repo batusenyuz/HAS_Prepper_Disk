@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HAS_PrepperDisk :: Haritalar</title>
+<link rel="stylesheet" href="lib/maplibre-gl.css">
+<style>
+  html,body,#map{margin:0;height:100%;font-family:Verdana,Tahoma,Arial,sans-serif;font-size:12px}
+  #bar{position:absolute;top:8px;left:8px;z-index:2;background:#fff;border:1px solid #98AAB1;padding:6px 8px;max-width:calc(100% - 70px)}
+  #bar a{color:#006699;text-decoration:none} #bar a:hover{color:#DD6900}
+  #msg{display:none;position:absolute;inset:0;z-index:3;background:#E5E5E5;padding:40px 16px;text-align:center;line-height:1.6}
+  #msg code{background:#fff;border:1px solid #98AAB1;padding:2px 6px}
+</style>
+</head>
+<body>
+<div id="bar"><a href="/home/">&larr; Ana Sayfa</a> &middot; <b>Haritalar</b> <span id="info"></span></div>
+<div id="msg"></div>
+<div id="map"></div>
+<script src="lib/maplibre-gl.js"></script>
+<script src="lib/pmtiles.js"></script>
+<script src="lib/basemaps.js"></script>
+<script>
+const O = location.origin, BASE = O + "/maps/";
+const showMsg = html => { const m = document.getElementById("msg"); m.innerHTML = html; m.style.display = "block"; };
+
+async function main(){
+  let idx;
+  try {
+    const r = await fetch("data/index.json", {cache: "no-cache"});
+    if (!r.ok) throw 0;
+    idx = await r.json();
+  } catch (e) { idx = null; }
+  if (!idx || !idx.layers || !idx.layers.length) {
+    showMsg(`<b>Henüz harita indirilmedi.</b><br>Sunucuda şu komutu çalıştırın:<br><br>
+      <code>docker compose run --rm downloader maps</code><br><br>
+      Bölgeler <code>config/maps.conf</code> dosyasından seçilir.<br><a href="/home/">Ana sayfaya dön</a>`);
+    return;
+  }
+
+  const protocol = new pmtiles.Protocol();
+  maplibregl.addProtocol("pmtiles", protocol.tile);
+
+  const flavor = basemaps.namedFlavor("light");
+  const style = {
+    version: 8,
+    glyphs: BASE + "assets/fonts/{fontstack}/{range}.pbf",
+    sprite: BASE + "assets/sprites/v4/light",
+    sources: {}, layers: []
+  };
+  const baseMax = idx.layers[0].maxzoom;
+  idx.layers.forEach((l, i) => {
+    const src = "s" + i;
+    style.sources[src] = {
+      type: "vector",
+      url: "pmtiles://" + BASE + l.url,
+      attribution: '<a href="https://protomaps.com">Protomaps</a> © <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>',
+      // Üst katmanlar taban haritanın bittiği yerden devralır / upper layers take over above base zoom
+      ...(i > 0 ? { minzoom: Math.min(baseMax, l.maxzoom) } : {})
+    };
+    for (const layer of basemaps.layers(src, flavor, { lang: "tr" })) {
+      if (i > 0 && layer.type === "background") continue;
+      layer.id = src + "-" + layer.id;
+      if (i > 0) layer.minzoom = Math.max(layer.minzoom || 0, Math.min(baseMax, l.maxzoom));
+      style.layers.push(layer);
+    }
+  });
+
+  const saved = (() => { try { return JSON.parse(localStorage.getItem("prepper-map-view")); } catch (e) { return null; } })();
+  const map = new maplibregl.Map({
+    container: "map", style, hash: true,
+    center: saved?.c || [35, 39], zoom: saved?.z ?? 5,
+    maxZoom: 19
+  });
+  map.addControl(new maplibregl.NavigationControl(), "top-right");
+  map.addControl(new maplibregl.ScaleControl({ unit: "metric" }));
+  map.addControl(new maplibregl.GeolocateControl({ trackUserLocation: true }), "top-right");
+  map.on("moveend", () => {
+    try { localStorage.setItem("prepper-map-view", JSON.stringify({ c: map.getCenter().toArray(), z: map.getZoom() })); } catch (e) {}
+  });
+  document.getElementById("info").textContent =
+    "· " + idx.layers.map(l => `${l.name} (z${l.maxzoom})`).join(", ") + (idx.build ? ` · ${idx.build}` : "");
+}
+main();
+</script>
+</body>
+</html>
