@@ -6,7 +6,8 @@ case "${1:-help}" in
   zims)        shift; exec bash /scripts/download-content.sh "${1:-/config/content.conf}" ;;
   maps)        shift; exec download-maps.sh "${1:-/config/maps.conf}" ;;
   maps-size)   shift; DRY_RUN=1 exec download-maps.sh "${1:-/config/maps.conf}" ;;
-  all)         bash /scripts/download-content.sh /config/content.conf; rc=$?
+  all)         rc=0  # biri hata verse de diğeri çalışsın / keep going if one step fails
+               bash /scripts/download-content.sh /config/content.conf || rc=1
                download-maps.sh /config/maps.conf || rc=1; exit $rc ;;
   sh|bash)     exec bash ;;
   *) cat <<'EOF'
