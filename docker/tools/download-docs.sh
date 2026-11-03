@@ -45,6 +45,11 @@ while IFS='|' read -r cat file title desc urls; do
   fi
 done < "$CONF"
 
+# MEGEP koleksiyonları (download-megep.py yazar) / MEGEP collections
+if [ -f "$DEST/megep.jsonl" ]; then
+  while IFS= read -r l; do [ -n "$l" ] && entries+=("$l"); done < "$DEST/megep.jsonl"
+fi
+
 { printf '{"docs":['; (IFS=,; printf '%s' "${entries[*]}"); printf ']}\n'; } > "$DEST/index.json.tmp"
 mv "$DEST/index.json.tmp" "$DEST/index.json"
 echo ">> $DEST/index.json yazıldı / written (${#entries[@]} belge / docs)"

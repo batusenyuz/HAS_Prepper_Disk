@@ -7,36 +7,86 @@
 <link rel="stylesheet" href="lib/maplibre-gl.css">
 <style>
   html,body,#map{margin:0;height:100%;font-family:Verdana,Tahoma,Arial,sans-serif;font-size:12px}
+  a{color:#006699;text-decoration:none} a:hover{color:#DD6900}
   #bar{position:absolute;top:8px;left:8px;z-index:2;background:#fff;border:1px solid #98AAB1;padding:6px 8px;max-width:calc(100% - 70px)}
-  #bar a{color:#006699;text-decoration:none} #bar a:hover{color:#DD6900}
+  #bar button{font:inherit;margin-left:6px;padding:2px 8px;border:1px solid #98AAB1;background:#006699;color:#fff;cursor:pointer}
+  #bar button[aria-pressed="true"]{background:#DD6900}
   #msg{display:none;position:absolute;inset:0;z-index:3;background:#E5E5E5;padding:40px 16px;text-align:center;line-height:1.6}
   #msg code{background:#fff;border:1px solid #98AAB1;padding:2px 6px}
+
+  /* İşletmeler paneli / business panel */
+  #panel{display:none;position:absolute;z-index:2;top:46px;left:8px;bottom:36px;width:330px;max-width:calc(100% - 16px);
+         background:#fff;border:1px solid #98AAB1;flex-direction:column;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+  #panel.open{display:flex}
+  #panel .hd{background:#006699;color:#FFA34F;font-weight:bold;padding:6px 8px;display:flex;justify-content:space-between}
+  #panel .hd button{background:none;border:0;color:#fff;font-size:16px;line-height:1;cursor:pointer}
+  #panel .sec{padding:6px 8px;border-bottom:1px solid #D1D7DC}
+  #q{width:100%;box-sizing:border-box;padding:6px;font:inherit;border:1px solid #98AAB1}
+  #cats{display:flex;flex-wrap:wrap;gap:2px 10px}
+  #cats label{display:flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;border:1px solid #fff;box-shadow:0 0 0 1px #888;flex:none}
+  .tools{display:flex;gap:6px;flex-wrap:wrap}
+  .tools button{font:inherit;padding:3px 8px;border:1px solid #98AAB1;background:#EFEFEF;cursor:pointer}
+  #hint{color:#555;margin-top:4px}
+  #list{overflow:auto;flex:1}
+  #list .it{padding:6px 8px;border-bottom:1px solid #EEE;cursor:pointer;display:flex;gap:8px}
+  #list .it:hover{background:#F3F6F8}
+  #list .it b{display:block} #list .it small{color:#555}
+  #list .dist{margin-left:auto;color:#333;white-space:nowrap}
+  .pop b{font-size:13px} .pop div{margin-top:3px} .pop .k{color:#555}
+  @media (max-width:600px){ #panel{top:auto;left:0;right:0;bottom:0;width:auto;max-width:none;height:55%} }
 </style>
 </head>
 <body>
-<div id="bar"><a href="/home/">&larr; Ana Sayfa</a> &middot; <b>Haritalar</b> <span id="info"></span></div>
+<div id="bar"><a href="/home/">&larr; Ana Sayfa</a> &middot; <b>Haritalar</b> <span id="info"></span><button id="toggle" hidden aria-pressed="false">İşletmeler</button></div>
 <div id="msg"></div>
+<div id="panel" aria-label="İşletmeler">
+  <div class="hd"><span>İşletmeler <span id="total"></span></span><button id="close" title="Kapat">&times;</button></div>
+  <div class="sec"><input id="q" type="search" placeholder="Ara: eczane, tüp gaz, Migros, fırın…" autocomplete="off"></div>
+  <div class="sec"><div id="cats"></div></div>
+  <div class="sec">
+    <div class="tools"><button id="near">Yakınımdakiler</button><button id="all">Hepsi</button><button id="none">Hiçbiri</button></div>
+    <div id="hint" class="small"></div>
+  </div>
+  <div id="list"></div>
+</div>
 <div id="map"></div>
 <script src="lib/maplibre-gl.js"></script>
 <script src="lib/pmtiles.js"></script>
 <script src="lib/basemaps.js"></script>
 <script>
 const O = location.origin, BASE = O + "/maps/";
-const showMsg = html => { const m = document.getElementById("msg"); m.innerHTML = html; m.style.display = "block"; };
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const showMsg = html => { const m = $("msg"); m.innerHTML = html; m.style.display = "block"; };
+const getJSON = async u => { try { const r = await fetch(u, {cache: "no-cache"}); return r.ok ? await r.json() : null; } catch (e) { return null; } };
+
+// Kategori renkleri / category colours (pois.py ile aynı kimlikler / same ids as pois.py)
+const COLORS = { acil:"#D7191C", saglik:"#E7298A", gida:"#1A9641", yakit:"#F28E2B", tamir:"#8C510A",
+                 para:"#2B83BA", yeme:"#7B3294", konaklama:"#018571", kamu:"#6B6B6B", diger:"#9AA5B1" };
+
+// Türkçe küçük harf + aksan kaldırma (pois.py fold ile aynı) / same folding as pois.py
+const FOLD = { "ç":"c","ğ":"g","ı":"i","ö":"o","ş":"s","ü":"u","â":"a","î":"i","û":"u" };
+const fold = s => s.replace(/İ/g, "i").replace(/I/g, "ı").toLowerCase()
+  .replace(/[çğıöşüâîû]/g, c => FOLD[c]).normalize("NFKD").replace(/[̀-ͯ]/g, "");
+const words = s => fold(s).split(/[^0-9a-z]+/).filter(w => w.length >= 2);
+
+function km(a, b){
+  const R = 6371, r = x => x * Math.PI / 180, dLat = r(b[1]-a[1]), dLon = r(b[0]-a[0]);
+  const h = Math.sin(dLat/2)**2 + Math.cos(r(a[1]))*Math.cos(r(b[1]))*Math.sin(dLon/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+const fmtKm = d => d < 1 ? Math.round(d*1000) + " m" : d < 10 ? d.toFixed(1).replace(".", ",") + " km" : Math.round(d) + " km";
 
 async function main(){
-  let idx;
-  try {
-    const r = await fetch("data/index.json", {cache: "no-cache"});
-    if (!r.ok) throw 0;
-    idx = await r.json();
-  } catch (e) { idx = null; }
+  const idx = await getJSON("data/index.json");
   if (!idx || !idx.layers || !idx.layers.length) {
     showMsg(`<b>Henüz harita indirilmedi.</b><br>Sunucuda şu komutu çalıştırın:<br><br>
       <code>docker compose run --rm downloader maps</code><br><br>
       Bölgeler <code>config/maps.conf</code> dosyasından seçilir.<br><a href="/home/">Ana sayfaya dön</a>`);
     return;
   }
+  const pois = await getJSON("data/pois/meta.json");
 
   const protocol = new pmtiles.Protocol();
   maplibregl.addProtocol("pmtiles", protocol.tile);
@@ -60,11 +110,36 @@ async function main(){
     };
     for (const layer of basemaps.layers(src, flavor, { lang: "tr" })) {
       if (i > 0 && layer.type === "background") continue;
+      // İşletme katmanı varken altlığın kendi POI ikonlarını gizle (çift görünmesin)
+      // Hide the basemap's own POI icons when the business layer is present
+      if (pois && layer.id === "pois") continue;
       layer.id = src + "-" + layer.id;
       if (i > 0) layer.minzoom = Math.max(layer.minzoom || 0, Math.min(baseMax, l.maxzoom));
       style.layers.push(layer);
     }
   });
+
+  if (pois) {
+    style.sources.biz = { type: "vector", url: "pmtiles://" + BASE + "data/pois/pois.pmtiles" };
+    const color = ["match", ["get", "c"], ...Object.entries(COLORS).flat(), "#9AA5B1"];
+    style.layers.push({
+      id: "biz", type: "circle", source: "biz", "source-layer": "pois",
+      paint: {
+        "circle-color": color,
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 3, 14, 4.5, 17, 7],
+        "circle-stroke-color": "#fff",
+        "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 10, 0.5, 15, 1.5]
+      }
+    }, {
+      id: "biz-label", type: "symbol", source: "biz", "source-layer": "pois", minzoom: 16,
+      layout: {
+        "text-field": ["coalesce", ["get", "n"], ["get", "k"]],
+        "text-font": ["Noto Sans Regular"], "text-size": 11,
+        "text-offset": [0, 0.9], "text-anchor": "top", "text-max-width": 9, "text-optional": true
+      },
+      paint: { "text-color": color, "text-halo-color": "#fff", "text-halo-width": 1.5 }
+    });
+  }
 
   const saved = (() => { try { return JSON.parse(localStorage.getItem("prepper-map-view")); } catch (e) { return null; } })();
   const map = new maplibregl.Map({
@@ -79,12 +154,134 @@ async function main(){
   });
   map.addControl(new maplibregl.NavigationControl(), "top-right");
   map.addControl(new maplibregl.ScaleControl({ unit: "metric" }));
-  map.addControl(new maplibregl.GeolocateControl({ trackUserLocation: true }), "top-right");
+  const geo = new maplibregl.GeolocateControl({ trackUserLocation: true, positionOptions: { enableHighAccuracy: true } });
+  map.addControl(geo, "top-right");
+  let me = null;   // kullanıcının konumu / user position
+  geo.on("geolocate", e => { me = [e.coords.longitude, e.coords.latitude]; });
   map.on("moveend", () => {
     try { localStorage.setItem("prepper-map-view", JSON.stringify({ c: map.getCenter().toArray(), z: map.getZoom() })); } catch (e) {}
   });
-  document.getElementById("info").textContent =
+  $("info").textContent =
     "· " + idx.layers.map(l => `${l.name} (z${l.maxzoom})`).join(", ") + (idx.build ? ` · ${idx.build}` : "");
+
+  if (pois) setupBusinesses(map, pois, () => me);
+}
+
+function setupBusinesses(map, meta, getMe){
+  const panel = $("panel"), toggle = $("toggle");
+  toggle.hidden = false;
+  const setOpen = open => {
+    panel.classList.toggle("open", open); toggle.setAttribute("aria-pressed", open);
+    try { localStorage.setItem("prepper-biz-open", open ? "1" : "0"); } catch (e) {}
+    if (open) (map.loaded() ? refresh() : map.once("idle", refresh));
+  };
+  toggle.onclick = () => setOpen(!panel.classList.contains("open"));
+  $("close").onclick = () => setOpen(false);
+  $("total").textContent = `(${meta.count.toLocaleString("tr-TR")})`;
+
+  // Kategori filtreleri / category filters
+  let active = new Set(meta.cats.map(c => c.id));
+  try { const s = JSON.parse(localStorage.getItem("prepper-biz-cats")); if (Array.isArray(s)) active = new Set(s); } catch (e) {}
+  $("cats").innerHTML = meta.cats.map(c => `<label><input type="checkbox" value="${c.id}" ${active.has(c.id) ? "checked" : ""}>
+    <span class="dot" style="background:${COLORS[c.id]}"></span>${esc(c.name)} <small>${c.count.toLocaleString("tr-TR")}</small></label>`).join("");
+  const applyFilter = () => {
+    const f = ["in", ["get", "c"], ["literal", [...active]]];
+    map.setFilter("biz", f); map.setFilter("biz-label", f);
+    try { localStorage.setItem("prepper-biz-cats", JSON.stringify([...active])); } catch (e) {}
+  };
+  const syncBoxes = () => $("cats").querySelectorAll("input").forEach(b => b.checked = active.has(b.value));
+  $("cats").onchange = e => { e.target.checked ? active.add(e.target.value) : active.delete(e.target.value); applyFilter(); refresh(); };
+  $("all").onclick = () => { active = new Set(meta.cats.map(c => c.id)); syncBoxes(); applyFilter(); refresh(); };
+  $("none").onclick = () => { active = new Set(); syncBoxes(); applyFilter(); refresh(); };
+  map.on("load", applyFilter);
+
+  // Ayrıntı penceresi / details popup
+  const popup = new maplibregl.Popup({ maxWidth: "300px" });
+  const catName = Object.fromEntries(meta.cats.map(c => [c.id, c.name]));
+  function show(p, lngLat){
+    const tel = p.ph ? p.ph.split(/[;,]/).map(t => t.trim()).filter(Boolean)
+      .map(t => `<a href="tel:${esc(t.replace(/[^\d+]/g, ""))}">${esc(t)}</a>`).join(", ") : "";
+    const web = p.w ? `<a href="${esc(/^https?:/.test(p.w) ? p.w : "http://" + p.w)}" target="_blank" rel="noopener">${esc(p.w)}</a>` : "";
+    const dist = getMe() ? ` · ${fmtKm(km(getMe(), lngLat))} uzakta` : "";
+    popup.setLngLat(lngLat).setHTML(`<div class="pop">
+      <b>${esc(p.n || p.k)}</b>
+      <div class="k"><span class="dot" style="background:${COLORS[p.c]}"></span> ${esc(p.k)} · ${esc(catName[p.c] || "")}${dist}</div>
+      ${p.br && p.br !== p.n ? `<div>Marka/işletmeci: ${esc(p.br)}</div>` : ""}
+      ${p.a ? `<div>📍 ${esc(p.a)}</div>` : ""}
+      ${tel ? `<div>📞 ${tel}</div>` : ""}
+      ${p.oh ? `<div>🕒 ${esc(p.oh)}</div>` : ""}
+      ${web ? `<div>🌐 ${web}</div>` : ""}
+      <div class="k">${lngLat[1].toFixed(5)}, ${lngLat[0].toFixed(5)}</div></div>`).addTo(map);
+  }
+  map.on("click", "biz", e => { const f = e.features[0]; show(f.properties, f.geometry.coordinates); });
+  map.on("mouseenter", "biz", () => map.getCanvas().style.cursor = "pointer");
+  map.on("mouseleave", "biz", () => map.getCanvas().style.cursor = "");
+
+  // Liste / list
+  const origin = () => getMe() || map.getCenter().toArray();
+  function renderList(items, note){
+    const o = origin();
+    items.forEach(it => it.d = km(o, it.ll));
+    items.sort((a, b) => a.d - b.d);
+    $("list").innerHTML = items.slice(0, 100).map((it, i) => `<div class="it" data-i="${i}">
+      <span class="dot" style="background:${COLORS[it.c]};margin-top:3px"></span>
+      <span><b>${esc(it.n)}</b><small>${esc(it.k)}${it.a ? " · " + esc(it.a) : ""}</small></span>
+      <span class="dist">${fmtKm(it.d)}</span></div>`).join("") || `<div class="it"><small>Sonuç yok.</small></div>`;
+    $("list").onclick = e => {
+      const el = e.target.closest(".it[data-i]"); if (!el) return;
+      const it = items[+el.dataset.i];
+      map.flyTo({ center: it.ll, zoom: Math.max(map.getZoom(), 17) });
+      map.once("moveend", () => {
+        const f = map.queryRenderedFeatures(map.project(it.ll), { layers: ["biz"] })[0];
+        show(f ? f.properties : { n: it.n, k: it.k, c: it.c }, it.ll);
+      });
+      if (innerWidth <= 600) setOpen(false);
+    };
+    $("hint").textContent = note;
+  }
+
+  // Yakınımdakiler: ekrandaki işletmeler / businesses currently on screen
+  let mode = "near";
+  function nearby(){
+    const seen = new Set(), items = [];
+    for (const f of map.queryRenderedFeatures({ layers: ["biz"] })) {
+      const p = f.properties, ll = f.geometry.coordinates, key = p.id || ll.join();
+      if (seen.has(key)) continue; seen.add(key);
+      items.push({ n: p.n || p.k, k: p.k, c: p.c, a: p.a, ll });
+    }
+    const z = map.getZoom();
+    renderList(items, (getMe() ? "Konumunuza" : "Harita merkezine") + ` göre sıralı, ekrandaki ${items.length} işletme.` +
+      (z < 14 ? " Tüm işletmeleri görmek için yakınlaştırın." : ""));
+  }
+
+  // Arama: kelime başlarına göre bölünmüş dizin / search via the 2-letter bucket index
+  const cache = new Map();
+  async function bucket(b){
+    if (!cache.has(b)) cache.set(b, getJSON(`data/pois/search/${encodeURIComponent(b)}.json`).then(r => r || []));
+    return cache.get(b);
+  }
+  let seq = 0;
+  async function search(q){
+    const qs = words(q); if (!qs.length) { mode = "near"; return nearby(); }
+    const my = ++seq;
+    $("hint").textContent = "Aranıyor…";
+    const rows = await bucket(qs[0].slice(0, 2));
+    if (my !== seq) return;
+    const items = [];
+    for (const [n, lon, lat, c, k] of rows) {
+      if (!active.has(c)) continue;
+      const ws = words(n + " " + k);
+      if (qs.every(q => ws.some(w => w.startsWith(q)))) items.push({ n, k, c, ll: [lon, lat] });
+    }
+    renderList(items, `"${q}" için ${items.length.toLocaleString("tr-TR")} sonuç` + (items.length > 100 ? ", en yakın 100 tanesi" : "") +
+      ` (${getMe() ? "konumunuza" : "harita merkezine"} göre).`);
+  }
+  let t;
+  $("q").oninput = () => { clearTimeout(t); t = setTimeout(() => { mode = $("q").value.trim() ? "search" : "near"; refresh(); }, 250); };
+  $("near").onclick = () => { $("q").value = ""; mode = "near"; if (!getMe()) map.once("idle", nearby); refresh(); };
+  const refresh = () => mode === "search" ? search($("q").value) : nearby();
+  map.on("idle", () => { if (mode === "near" && panel.classList.contains("open")) nearby(); });
+  try { if (localStorage.getItem("prepper-biz-open") === "1" && innerWidth > 600) setOpen(true); } catch (e) {}
 }
 main();
 </script>

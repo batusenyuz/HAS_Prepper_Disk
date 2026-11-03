@@ -167,12 +167,19 @@ const CATS = [
   ]},
 ];
 
-/* Türkçe PDF belgeler: [{cat, file, title, desc, kb, pages}] */
+/* Türkçe PDF belgeler: [{cat, file|url, title, desc, kb, pages, count?}] */
 async function loadDocs(){
   try{
     const r = await fetch("/belgeler/index.json", {cache:"no-cache"});
     return r.ok ? (await r.json()).docs || [] : [];
   }catch(e){ return []; }
+}
+/* Haritadaki işletme katmanı (docker compose run --rm pois) / business layer */
+async function loadPois(){
+  try{
+    const r = await fetch("/maps/data/pois/meta.json", {cache:"no-cache"});
+    return r.ok ? await r.json() : null;
+  }catch(e){ return null; }
 }
 const fmtSize = kb => kb >= 1048576 ? (kb/1048576).toFixed(1).replace(".", ",") + " GB"
                     : kb >= 1024 ? Math.round(kb/1024) + " MB" : kb + " KB";
@@ -196,15 +203,20 @@ async function loadBooks(){
   }catch(e){ return null; }
 }
 
-function render(books, docs){
+function render(books, docs, pois){
+  if (pois) docs = [...(docs || []), { cat: "Haritalar ve Navigasyon", url: "/maps/", lang: "TR",
+    title: "Türkiye İşletmeleri", size: "—",
+    desc: "Haritada tüm işletmeler: eczane, hastane, market, akaryakıt, tüp gaz, hırdavat, oto tamir, banka, toplanma alanları. Adres, telefon ve çalışma saatleriyle; internetsiz arama.",
+    status: `${pois.count.toLocaleString("tr-TR")} işletme · ${(pois.date || "").slice(0, 10)}` }];
   let html = "", ready = 0, total = 0;
   const used = new Set();
   const sel = document.getElementById("book");
   for (const c of CATS) {
     html += `<tr><td class="cat" colspan="5">${esc(c.title)}</td></tr>`;
     const pdfs = (docs || []).filter(d => d.cat === c.title).map(d => ({
-      name: d.title, desc: d.desc, lang: "TR", size: fmtSize(d.kb),
-      url: "/belgeler/" + encodeURIComponent(d.file), status: `PDF · ${d.pages} sayfa`
+      name: d.title, desc: d.desc, lang: "TR", size: d.size || fmtSize(d.kb),
+      url: d.url || "/belgeler/" + encodeURIComponent(d.file),
+      status: d.status || (d.count ? `${d.count} modül · ${d.pages} sayfa` : `PDF · ${d.pages} sayfa`)
     }));
     for (const i of [...pdfs, ...c.items]) {
       total++;
@@ -267,7 +279,7 @@ document.getElementById("search").addEventListener("submit", e => {
     : `/kiwix/search?pattern=${encodeURIComponent(q)}`;
 });
 
-Promise.all([loadBooks(), loadDocs()]).then(([b, d]) => render(b, d));
+Promise.all([loadBooks(), loadDocs(), loadPois()]).then(([b, d, p]) => render(b, d, p));
 </script>
 </body>
 </html>

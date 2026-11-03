@@ -39,12 +39,17 @@ docker compose run --rm downloader zims
 # Türkçe PDF belgeler (AFAD, Sağlık Bakanlığı, Hesperian...): config/docs.conf
 docker compose run --rm downloader docs
 
+# Haritaya Türkiye'deki tüm işletmeleri ekle (OpenStreetMap, ~650 MB indirir):
+docker compose run --rm pois
+
 # Haritalar: config/maps.conf. Önce boyutlara bak:
 docker compose run --rm downloader maps-size
 docker compose run --rm downloader maps
 ```
 
 - İndirmeler yarıda kalırsa aynı komutu tekrar çalıştır. ZIM'ler kaldığı yerden devam eder, haritalar baştan iner.
+- **İşletmeler:** `pois` komutu OpenStreetMap'teki tüm işletmeleri (eczane, hastane, market, akaryakıt, tüp gaz, hırdavat, oto tamir, banka, otel…) ve afet toplanma alanlarını, su kaynaklarını haritaya ekler. Haritada **İşletmeler** düğmesiyle internetsiz arama, kategori filtresi ve "Yakınımdakiler" listesi açılır. Başka bir bölge için `.env` içinde `POI_PBF_URL` ver (Geofabrik `.osm.pbf` adresi). Güncellemek için: `docker compose run --rm -e FORCE=1 pois`.
+- MEGEP modülleri (elektrik, tesisat, motor bakımı) `config/megep.conf` dosyasında listelenir ve `docs` adımıyla iner.
 - Türkçe belgeler `/belgeler/` altında sunulur ve ana sayfada ilgili bölümün başında **TR** olarak listelenir. Yeni belge eklemek için `config/docs.conf` dosyasına bir satır ekle.
 - Yeni ZIM'ler birkaç saniye içinde Kiwix'te görünür, yeniden başlatma gerekmez (`--monitorLibrary`).
 - Haritalar her hafta yenilenen Protomaps dünya derlemesinden kesilir. Sadece gereken parçalar indirilir. Belirli bir derlemeyi sabitlemek için `.env` içinde `PROTOMAPS_BUILD=20261102` kullan. Haritaları yenilemek için: `docker compose run --rm -e FORCE=1 downloader maps`.
@@ -88,7 +93,8 @@ Services: `web` (nginx, homepage, map viewer, reverse proxy), `kiwix` (official 
 cp .env.example .env                       # point DATA_DIR at a big disk
 docker compose up -d --build               # open http://<host>/home
 docker compose run --rm downloader zims    # ZIMs from config/content.conf
-docker compose run --rm downloader docs    # Turkish PDFs from config/docs.conf
+docker compose run --rm downloader docs    # Turkish PDFs (docs.conf, megep.conf)
+docker compose run --rm pois               # every business in Turkey on the map (OSM)
 docker compose run --rm downloader maps-size
 docker compose run --rm downloader maps    # regions from config/maps.conf
 ```

@@ -5,6 +5,7 @@
 #   docker compose run --rm downloader zims   # config/content.conf içeriklerini indir
 #   docker compose run --rm downloader docs   # config/docs.conf Türkçe PDF belgelerini indir
 #   docker compose run --rm downloader maps   # config/maps.conf haritalarını indir
+#   docker compose run --rm pois              # Türkiye'deki tüm işletmeleri haritaya ekle
 #
 # Ayrıntılar / details: DOCKER.md
 
@@ -48,6 +49,18 @@ services:
     user: "${PUID:-1000}:${PGID:-1000}"
     volumes:
       - ${DATA_DIR:-./data}/kolibri:/data
+
+  # Türkiye'deki tüm işletmeleri haritaya hazırlar / builds the business layer (docker compose run --rm pois)
+  pois:
+    build: ./docker/mapbuilder
+    image: prepperdisk/mapbuilder:local
+    user: "${PUID:-1000}:${PGID:-1000}"
+    profiles: [tools]
+    environment:
+      TZ: ${TZ:-Europe/Istanbul}
+      POI_PBF_URL: ${POI_PBF_URL:-https://download.geofabrik.de/europe/turkey-latest.osm.pbf}
+    volumes:
+      - ${DATA_DIR:-./data}/maps:/data/maps
 
   # Tek seferlik indirici / one-shot downloader (docker compose run --rm downloader ...)
   downloader:
