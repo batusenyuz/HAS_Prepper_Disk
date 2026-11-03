@@ -125,6 +125,8 @@
    zim: Kiwix dosya adının tarihsiz başı. Sayfa, cihazda hangi sürümün
         yüklü olduğunu Kiwix kataloğundan kendisi bulur.
    url: zim olmayan servisler için sabit adres.
+   Türkçe PDF belgeler config/docs.conf'tan gelir (/belgeler/index.json) ve
+   aynı adlı bölümün başına eklenir.
    Cihazda bulunamayan ZIM'ler gri klasörle "henüz yüklenmedi" görünür. */
 const CATS = [
   { title:"Ansiklopedi", items:[
@@ -132,7 +134,7 @@ const CATS = [
     { name:"Wikipedia (English)", desc:"Tüm İngilizce Wikipedia, resimleriyle birlikte.", lang:"EN", size:"~120 GB", zim:"wikipedia_en_all_maxi", search:true },
   ]},
   { title:"Haritalar ve Navigasyon", items:[
-    { name:"Dünya Haritası", desc:"Avrupa ve Orta Doğu sokak seviyesinde, dünyanın geri kalanı şehir seviyesinde.", lang:"—", size:"~40 GB", url:"/maps" },
+    { name:"Dünya Haritası", desc:"Avrupa ve Orta Doğu sokak seviyesinde, dünyanın geri kalanı şehir seviyesinde.", lang:"—", size:"~59 GB", url:"/maps" },
   ]},
   { title:"Hayatta Kalma ve Hazırlık", items:[
     { name:"Afet Sonrası Kitaplığı", desc:"Barınak, enerji, tarım ve yeniden yapılanma üzerine kitaplar.", lang:"EN", size:"~615 MB", zim:"zimgit-post-disaster_en", search:true },
@@ -144,13 +146,13 @@ const CATS = [
   ]},
   { title:"Sağlık ve İlk Yardım", items:[
     { name:"WikiMed", desc:"Wikipedia'nın tıp maddeleri: hastalıklar, ilaçlar, anatomi.", lang:"EN", size:"~2 GB", zim:"wikipedia_en_medicine_maxi", search:true },
-    { name:"WikEM", desc:"Acil tıp başvuru kaynağı.", lang:"EN", size:"~260 MB", zim:"wikem_en_all_maxi", search:true },
     { name:"MDWiki", desc:"Doktorlar tarafından düzenlenen tıp ansiklopedisi.", lang:"EN", size:"~2 GB", zim:"mdwiki_en_all_maxi", search:true },
     { name:"Tıp Kitaplığı", desc:"Temel tıp ve sağlık kitapları.", lang:"EN", size:"~67 MB", zim:"zimgit-medicine_en" },
     { name:"Askeri Sahra Tıbbı", desc:"Sahada travma ve yaralı bakımı.", lang:"EN", size:"~78 MB", zim:"irp.fas.org_en_military-medicine" },
     { name:"NHS İlaç Rehberi", desc:"İlaçların kullanımı, dozları ve yan etkileri.", lang:"EN", size:"~15 MB", zim:"nhs.uk_en_medicines" },
   ]},
   { title:"Tamir ve Beceriler", items:[
+    { name:"iFixit (Türkçe)", desc:"Telefon, bilgisayar, ev aleti ve araç tamiri için adım adım Türkçe rehberler.", lang:"TR", size:"~3,6 GB", zim:"ifixit_tr_all", search:true },
     { name:"iFixit", desc:"Cihaz ve araç tamiri için adım adım rehberler.", lang:"EN", size:"~3 GB", zim:"ifixit_en_all", search:true },
     { name:"Ev Tamiri (DIY)", desc:"Elektrik, tesisat ve yapı soruları.", lang:"EN", size:"—", zim:"diy.stackexchange.com_en_all" },
     { name:"Bahçecilik", desc:"Sebze yetiştirme, toprak ve bitki hastalıkları.", lang:"EN", size:"—", zim:"gardening.stackexchange.com_en_all" },
@@ -164,6 +166,16 @@ const CATS = [
     { name:"Kolibri", desc:"Çevrimdışı dersler ve eğitim videoları.", lang:"—", size:"—", url:"/kolibri" },
   ]},
 ];
+
+/* Türkçe PDF belgeler: [{cat, file, title, desc, kb, pages}] */
+async function loadDocs(){
+  try{
+    const r = await fetch("/belgeler/index.json", {cache:"no-cache"});
+    return r.ok ? (await r.json()).docs || [] : [];
+  }catch(e){ return []; }
+}
+const fmtSize = kb => kb >= 1048576 ? (kb/1048576).toFixed(1).replace(".", ",") + " GB"
+                    : kb >= 1024 ? Math.round(kb/1024) + " MB" : kb + " KB";
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
@@ -184,15 +196,19 @@ async function loadBooks(){
   }catch(e){ return null; }
 }
 
-function render(books){
+function render(books, docs){
   let html = "", ready = 0, total = 0;
   const used = new Set();
   const sel = document.getElementById("book");
   for (const c of CATS) {
     html += `<tr><td class="cat" colspan="5">${esc(c.title)}</td></tr>`;
-    for (const i of c.items) {
+    const pdfs = (docs || []).filter(d => d.cat === c.title).map(d => ({
+      name: d.title, desc: d.desc, lang: "TR", size: fmtSize(d.kb),
+      url: "/belgeler/" + encodeURIComponent(d.file), status: `PDF · ${d.pages} sayfa`
+    }));
+    for (const i of [...pdfs, ...c.items]) {
       total++;
-      let url = i.url || null, status = i.url ? "Kurulu" : "Henüz yüklenmedi";
+      let url = i.url || null, status = i.status || (i.url ? "Kurulu" : "Henüz yüklenmedi");
       if (i.zim) {
         if (books === null) { url = "/kiwix/"; status = "Kütüphaneden açın"; }
         else {
@@ -251,7 +267,7 @@ document.getElementById("search").addEventListener("submit", e => {
     : `/kiwix/search?pattern=${encodeURIComponent(q)}`;
 });
 
-loadBooks().then(render);
+Promise.all([loadBooks(), loadDocs()]).then(([b, d]) => render(b, d));
 </script>
 </body>
 </html>

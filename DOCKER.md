@@ -36,12 +36,16 @@ docker compose up -d --build
 # Kütüphane: config/content.conf (varsayılan ~150 GB)
 docker compose run --rm downloader zims
 
+# Türkçe PDF belgeler (AFAD, Sağlık Bakanlığı, Hesperian...): config/docs.conf
+docker compose run --rm downloader docs
+
 # Haritalar: config/maps.conf. Önce boyutlara bak:
 docker compose run --rm downloader maps-size
 docker compose run --rm downloader maps
 ```
 
 - İndirmeler yarıda kalırsa aynı komutu tekrar çalıştır. ZIM'ler kaldığı yerden devam eder, haritalar baştan iner.
+- Türkçe belgeler `/belgeler/` altında sunulur ve ana sayfada ilgili bölümün başında **TR** olarak listelenir. Yeni belge eklemek için `config/docs.conf` dosyasına bir satır ekle.
 - Yeni ZIM'ler birkaç saniye içinde Kiwix'te görünür, yeniden başlatma gerekmez (`--monitorLibrary`).
 - Haritalar her hafta yenilenen Protomaps dünya derlemesinden kesilir. Sadece gereken parçalar indirilir. Belirli bir derlemeyi sabitlemek için `.env` içinde `PROTOMAPS_BUILD=20261102` kullan. Haritaları yenilemek için: `docker compose run --rm -e FORCE=1 downloader maps`.
 - Uzun indirmeleri SSH kopsa da sürsün diye `tmux` / `screen` içinde ya da `nohup` ile çalıştır.
@@ -84,6 +88,7 @@ Services: `web` (nginx, homepage, map viewer, reverse proxy), `kiwix` (official 
 cp .env.example .env                       # point DATA_DIR at a big disk
 docker compose up -d --build               # open http://<host>/home
 docker compose run --rm downloader zims    # ZIMs from config/content.conf
+docker compose run --rm downloader docs    # Turkish PDFs from config/docs.conf
 docker compose run --rm downloader maps-size
 docker compose run --rm downloader maps    # regions from config/maps.conf
 ```

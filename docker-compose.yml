@@ -3,6 +3,7 @@
 #   cp .env.example .env            # DATA_DIR, HTTP_PORT ... ayarla / adjust
 #   docker compose up -d --build    # web + kiwix + kolibri
 #   docker compose run --rm downloader zims   # config/content.conf içeriklerini indir
+#   docker compose run --rm downloader docs   # config/docs.conf Türkçe PDF belgelerini indir
 #   docker compose run --rm downloader maps   # config/maps.conf haritalarını indir
 #
 # Ayrıntılar / details: DOCKER.md
@@ -28,6 +29,7 @@ services:
       - "${HTTP_PORT:-80}:8080"
     volumes:
       - ${DATA_DIR:-./data}/maps:/srv/maps-data:ro
+      - ${DATA_DIR:-./data}/docs:/srv/docs:ro
     depends_on: [kiwix, kolibri]
 
   kiwix:
@@ -62,5 +64,6 @@ services:
     volumes:
       - ${DATA_DIR:-./data}/zims:/data/zims
       - ${DATA_DIR:-./data}/maps:/data/maps
+      - ${DATA_DIR:-./data}/docs:/data/docs
       - ./config:/config:ro
       - ./scripts:/scripts:ro

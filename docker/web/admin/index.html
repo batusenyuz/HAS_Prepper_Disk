@@ -24,6 +24,10 @@
   <pre>docker compose run --rm downloader zims</pre>
   <p>Yarıda kalırsa aynı komutu tekrar çalıştırın, kaldığı yerden devam eder. Yeni kitaplar birkaç saniye içinde kütüphanede görünür.</p>
 
+  <h2>Türkçe belgeler (PDF)</h2>
+  <p>AFAD, Sağlık Bakanlığı ve Hesperian gibi kaynakların Türkçe rehberleri <code>config/docs.conf</code> dosyasında listelenir. <a href="/belgeler/">Tüm belgeler</a></p>
+  <pre>docker compose run --rm downloader docs</pre>
+
   <h2>Haritalar</h2>
   <p>Bölgeleri <code>config/maps.conf</code> dosyasında seçin. İndirmeden önce boyutları görmek için:</p>
   <pre>docker compose run --rm downloader maps-size
