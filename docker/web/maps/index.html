@@ -72,6 +72,11 @@ async function main(){
     center: saved?.c || [35, 39], zoom: saved?.z ?? 5,
     maxZoom: 19
   });
+  // Stil, sprite setinde olmayan birkaç ikon isteyebilir (örn. "townhall"): boş görselle sessizce geç
+  // The style may ask for icons missing from the sprite sheet: fill them with a blank image
+  map.on("styleimagemissing", e => {
+    if (!map.hasImage(e.id)) map.addImage(e.id, { width: 1, height: 1, data: new Uint8Array(4) });
+  });
   map.addControl(new maplibregl.NavigationControl(), "top-right");
   map.addControl(new maplibregl.ScaleControl({ unit: "metric" }));
   map.addControl(new maplibregl.GeolocateControl({ trackUserLocation: true }), "top-right");
